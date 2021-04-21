@@ -7,6 +7,25 @@ const ipfsClient = require('ipfs-http-client')
 const ipfs = ipfsClient({ host: 'ipfs.infura.io', port: 5001, protocol: 'https' }) // leaving out the arguments will default to these values
 
 class App extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { 
+      buffer: null,
+      memeHash: 'QmcdDq6h9TeGVF8TTpcA7Q7wMZbZWQZ7F9PetxLNbnE3jP'
+    };
+  }
+
+  captureFile = (event) => {
+    event.preventDefault()
+    console.log ('file captured...')
+    // process file for ipfs
+    const file = event.target.files[0]
+    const reader = window.FileReader()
+    reader.readAsArrayBuffer(file)
+    reader.onloadend = () => {
+      this.setState({ buffer: Buffer.from(reader.result) })
+    }
+  }
 
   async componentWillMount() {
     await this.loadWeb3()
@@ -37,23 +56,13 @@ class App extends Component {
       const contract = web3.eth.Contract(Meme.abi, networkData.address)
       this.setState({ contract })
       const memeHash = await contract.methods.get().call()
-      this.setState({ memeHash })
+      this.setState({memeHash})
     } else {
       window.alert('Smart contract not deployed to detected network.')
     }
   }
 
-  constructor(props) {
-    super(props)
 
-    this.state = {
-      memeHash: '',
-      contract: null,
-      web3: null,
-      buffer: null,
-      account: null
-    }
-  }
 
   captureFile = (event) => {
     event.preventDefault()
@@ -66,19 +75,21 @@ class App extends Component {
     }
   }
 
-  onSubmit = (event) => {
-    event.preventDefault()
-    console.log("Submitting file to ipfs...")
-    ipfs.add(this.state.buffer, (error, result) => {
-      console.log('Ipfs result', result)
-      if(error) {
-        console.error(error)
-        return
-      }
-       this.state.contract.methods.set(result[0].hash).send({ from: this.state.account }).then((r) => {
-         return this.setState({ memeHash: result[0].hash })
+onSubmit = async (event) => {
+      event.preventDefault()
+      console.log("Submitting the form...")
+      await ipfs.add(this.state.buffer, (error, result) => {
+           console.log('IPFS result', result)
+           const memeHash = result[0].hash
+           this.setState({ memeHash })
+            if(error) {
+               console.error(error)
+               return
+            }
+            this.state.contract.methods.set(memeHash).send({ from: this.state.account }).then((r) => {
+              this.setState({memeHash})
+            })
        })
-    })
   }
 
   render() {
@@ -87,11 +98,10 @@ class App extends Component {
         <nav className="navbar navbar-dark fixed-top bg-dark flex-md-nowrap p-0 shadow">
           <a
             className="navbar-brand col-sm-3 col-md-2 mr-0"
-            href="http://www.dappuniversity.com/bootcamp"
             target="_blank"
             rel="noopener noreferrer"
-          >
-            Meme of the Day
+            href={`https://gateway.ipfs.io/ipfs/${this.state.memeHash}`}
+            download > click here to download the uploaded image
           </a>
         </nav>
         <div className="container-fluid mt-5">
@@ -99,17 +109,17 @@ class App extends Component {
             <main role="main" className="col-lg-12 d-flex text-center">
               <div className="content mr-auto ml-auto">
                 <a
-                  href="http://www.dappuniversity.com/bootcamp"
-                  target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <img src={`https://ipfs.infura.io/ipfs/${this.state.memeHash}`} />
+                  <img src={`https://gateway.ipfs.io/ipfs/QmSVPV4ccnNiz65PmPZt76pfpGZza6mK7Czh5sxyFzGxoV`}/>
                 </a>
                 <p>&nbsp;</p>
-                <h2>Change Meme</h2>
-                <form onSubmit={this.onSubmit} >
-                  <input type='file' onChange={this.captureFile} />
-                  <input type='submit' />
+                <h2>New image</h2>
+
+                  <form onSubmit={this.onSubmit} >
+                  <input type='file' onChange={this.captureFile}/>
+                  <input type='submit'/>
+
                 </form>
               </div>
             </main>
